@@ -1,5 +1,5 @@
 const GAS_URL = "https://script.google.com/macros/s/AKfycbxrjVvPkjC83NB1krzh_F8oeGk_JQNZJFtlY9-ycBZTN0aUFZXKJcbPEsgx9RWv0j7W/exec";
-const SHEET_NAME = "Encargados Registro";
+const SHEET_NAME = "Encargado";
 
 document.addEventListener('DOMContentLoaded', () => {
     try { initApp(); } catch (e) { console.error("Error al iniciar:", e); }
@@ -18,7 +18,6 @@ const modulesData = {
 
 function $id(id) { return document.getElementById(id); }
 
-// Devuelve el valor del radio seleccionado o NULL si no hay ninguno marcado
 function getRadioValue(name) {
     const checked = document.querySelector('input[name="' + name + '"]:checked');
     return checked ? checked.value : null;
@@ -39,32 +38,28 @@ function getDeviceId() {
 }
 
 function getShiftId(date, course, mod) {
-    const d = (date  || '').replace(/-/g, '');
-    const c = (course|| '').replace(/[^a-z0-9]/gi, '').substr(0, 6);
-    const m = (mod   || '').replace(/[^a-z0-9]/gi, '').substr(0, 6);
+    const d = (date  || '00000000').replace(/-/g, '');
+    const c = (course|| 'CURSO').replace(/[^a-z0-9]/gi, '').substr(0, 6);
+    const m = (mod   || 'MOD').replace(/[^a-z0-9]/gi, '').substr(0, 6);
     return ('SHIFT-' + d + '-' + c + '-' + m).toUpperCase();
 }
 
 /* ─── INIT ───────────────────────────────────────────────────────────── */
 
 function initApp() {
-    // Fecha de hoy por defecto
     const dateInput = $id('regDate');
     if (dateInput && !dateInput.value) {
         dateInput.value = new Date().toISOString().split('T')[0];
     }
 
-    // Fase ENTRADA por defecto
     const phaseEntry = $id('phase-entry');
     if (phaseEntry) phaseEntry.checked = true;
     syncUI();
 
-    // Cambio de fase
     document.querySelectorAll('input[name="regPhase"]').forEach(function(r) {
         r.addEventListener('change', function() { syncUI(); updateProgress(); });
     });
 
-    // Curso → rellena módulos
     var courseEl = $id('studentCourse');
     if (courseEl) {
         courseEl.addEventListener('change', function(e) {
@@ -74,7 +69,6 @@ function initApp() {
         });
     }
 
-    // Quitar el rojo cuando el usuario interactúa con cualquier campo
     document.querySelectorAll('input, select, textarea').forEach(function(field) {
         var events = (field.type === 'checkbox' || field.type === 'radio') ? ['change'] : ['input', 'change'];
         events.forEach(function(evt) {
@@ -89,12 +83,10 @@ function initApp() {
         });
     });
 
-    // Contadores de herramientas y amoladoras
     document.querySelectorAll('.grinder-count, .tool-count').forEach(function(s) {
         s.addEventListener('change', function(e) { handleCountChange(e.target); });
     });
 
-    // Formulario
     var form = $id('registrationForm');
     if (form) form.addEventListener('submit', handleFormSubmit);
 
@@ -107,8 +99,6 @@ function initApp() {
     initAnimations();
     updateProgress();
 }
-
-/* ─── MÓDULOS ────────────────────────────────────────────────────────── */
 
 function updateModules(course) {
     var modEl = $id('studentModule');
@@ -123,8 +113,6 @@ function updateModules(course) {
         modEl.appendChild(opt);
     });
 }
-
-/* ─── SYNC UI (FASE) ─────────────────────────────────────────────────── */
 
 function syncUI() {
     var phase  = getSelectedPhase();
@@ -154,8 +142,6 @@ function syncUI() {
     try { if (window.lucide) lucide.createIcons(); } catch(e) {}
 }
 
-/* ─── CONTADORES ─────────────────────────────────────────────────────── */
-
 function handleCountChange(s) {
     if (!s) return;
     var target = s.dataset.target;
@@ -165,8 +151,8 @@ function handleCountChange(s) {
     var obsField = $id(key);
 
     if (obsField) {
-        if (val < min) { obsField.style.display = 'block'; obsField.required = true; }
-        else           { obsField.style.display = 'none';  obsField.required = false; obsField.value = ''; }
+        if (val < min) { obsField.style.display = 'block'; }
+        else           { obsField.style.display = 'none';  obsField.value = ''; }
     }
 
     var gMissing = Array.from(document.querySelectorAll('.grinder-count')).some(function(x) { return (parseInt(x.value)||0) < 4; });
@@ -178,8 +164,6 @@ function handleCountChange(s) {
 
     updateProgress();
 }
-
-/* ─── ANIMACIONES ────────────────────────────────────────────────────── */
 
 function initAnimations() {
     if (!window.IntersectionObserver) return;
@@ -193,8 +177,6 @@ function initAnimations() {
     }, { threshold: 0.1 });
     document.querySelectorAll('.card').forEach(function(c) { obs.observe(c); });
 }
-
-/* ─── PROGRESO ───────────────────────────────────────────────────────── */
 
 function updateProgress() {
     var isExit = (getSelectedPhase() === 'SALIDA');
@@ -224,8 +206,6 @@ function updateProgress() {
     if (bar) bar.style.width = pct + '%';
 }
 
-/* ─── VALIDACIÓN ─────────────────────────────────────────────────────── */
-
 function clearError(field) {
     if (field) field.classList.remove('invalid-field');
 }
@@ -234,36 +214,28 @@ function markInvalid(el) {
     if (el) el.classList.add('invalid-field');
 }
 
-// Valida un radio group: si no hay ninguno marcado, pinta el contenedor padre
 function validateRadio(name, parentSelector) {
-    if (getRadioValue(name) !== null) return true;   // hay algo marcado → OK
+    if (getRadioValue(name) !== null) return true;
     var radios = document.getElementsByName(name);
-    if (radios.length === 0) return true;            // no existe en esta fase → ignorar
+    if (radios.length === 0) return true;
     var parent = radios[0].closest(parentSelector || '.status-selector');
     if (parent) markInvalid(parent);
     return false;
 }
 
 function validateForm() {
-    // 1. Borrar errores anteriores
     document.querySelectorAll('.invalid-field').forEach(function(e) { e.classList.remove('invalid-field'); });
-
     var ok = true;
 
-    // ── Datos generales ──────────────────────────────────────────────
     var nameEl = $id('studentName');
     if (!nameEl || nameEl.value.trim().length < 3) { markInvalid(nameEl); ok = false; }
-
     var dateEl = $id('regDate');
     if (!dateEl || !dateEl.value) { markInvalid(dateEl); ok = false; }
-
     var courseEl = $id('studentCourse');
     if (!courseEl || !courseEl.value) { markInvalid(courseEl); ok = false; }
-
     var modEl = $id('studentModule');
     if (!modEl || !modEl.value) { markInvalid(modEl); ok = false; }
 
-    // ── Gases ────────────────────────────────────────────────────────
     ['gas-argon-open','gas-argon-reg','gas-argon-change',
      'gas-mix-open',  'gas-mix-reg',  'gas-mix-change'].forEach(function(n) {
         if (!validateRadio(n, '.check-row')) ok = false;
@@ -273,19 +245,24 @@ function validateForm() {
         if (!f.value) { markInvalid(f); ok = false; }
     });
 
-    // ── Armarios ─────────────────────────────────────────────────────
     ['status-cab-amolado','status-cab-piezas','status-cab-varillas','status-cab-profesor'].forEach(function(n) {
         if (!validateRadio(n, '.cabinet-item')) ok = false;
     });
 
-    // ── Inspección Final (solo Salida) ────────────────────────────────
     if (getSelectedPhase() === 'SALIDA') {
         ['cab-gas-closed','cab-clean','area-amol-clean','cab-tidy'].forEach(function(n) {
             if (!validateRadio(n, '.check-row-full')) ok = false;
         });
     }
 
-    // ── Certificación ────────────────────────────────────────────────
+    // Validar observaciones si son visibles
+    document.querySelectorAll('.grinder-obs, .tool-obs').forEach(function(obs) {
+        if (obs.style.display !== 'none' && !obs.value.trim()) {
+            markInvalid(obs);
+            ok = false;
+        }
+    });
+
     var confirmEl = $id('confirmData');
     if (!confirmEl || !confirmEl.checked) {
         var box = confirmEl ? confirmEl.closest('.confirmation-check') : null;
@@ -296,13 +273,10 @@ function validateForm() {
     return ok;
 }
 
-/* ─── SUBMIT ─────────────────────────────────────────────────────────── */
-
 async function handleFormSubmit(e) {
     e.preventDefault();
     var btn = $id('btnFinalize');
 
-    // ── Validar ──────────────────────────────────────────────────────
     if (!validateForm()) {
         if (btn) {
             btn.classList.add('btn-error');
@@ -316,7 +290,6 @@ async function handleFormSubmit(e) {
         return;
     }
 
-    // ── Recoger datos ────────────────────────────────────────────────
     var amoladoras = [];
     document.querySelectorAll('.grinder-count').forEach(function(s) {
         var t = s.dataset.target;
@@ -364,7 +337,6 @@ async function handleFormSubmit(e) {
         security: { deviceId: getDeviceId() }
     };
 
-    // ── Enviar ───────────────────────────────────────────────────────
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando...'; }
 
     try {
@@ -391,8 +363,6 @@ async function handleFormSubmit(e) {
     }
 }
 
-/* ─── PDF ────────────────────────────────────────────────────────────── */
-
 async function generatePDF(returnBase64) {
     if (!window.jspdf) { alert('Librería PDF no cargada.'); return null; }
     var jsPDF = window.jspdf.jsPDF;
@@ -400,7 +370,6 @@ async function generatePDF(returnBase64) {
     var d    = registrationData;
     var isExit = (d.phase === 'SALIDA');
 
-    // Cabecera
     doc.setFillColor.apply(doc, isExit ? [29,78,216] : [15,23,42]);
     doc.rect(0, 0, 210, 40, 'F');
     doc.setTextColor(255,255,255); doc.setFontSize(20);
@@ -435,9 +404,7 @@ async function generatePDF(returnBase64) {
 
     if (isExit && d.cabinas) {
         title('6. INSPECCIÓN FINAL');
-        line('- Gas Cabinas: ' + d.cabinas.gas + ' | Amolado: ' + d.cabinas.amolado);
         line('- Cabinas limpias: ' + d.cabinas.limpia + ' | Taller ordenado: ' + d.cabinas.ordenada);
-        y += 3;
     }
 
     title('7. OBSERVACIONES');
