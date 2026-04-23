@@ -51,15 +51,15 @@
                         </div>
                         <div class="input-group">
                             <label for="studentName">Nombre y Apellidos</label>
-                            <input type="text" id="studentName" placeholder="Escribe tu nombre completo..." required>
+                            <input type="text" id="studentName" placeholder="Escribe tu nombre completo...">
                         </div>
                         <div class="input-group">
                             <label for="regDate">Fecha</label>
-                            <input type="date" id="regDate" required>
+                            <input type="date" id="regDate">
                         </div>
                         <div class="input-group">
                             <label for="studentCourse">Ciclo Formativo</label>
-                            <select id="studentCourse" required>
+                            <select id="studentCourse">
                                 <option value="" disabled selected>Selecciona tu curso...</option>
                                 <option value="1º GM Soldadura">1º GM Soldadura</option>
                                 <option value="2º GM Soldadura">2º GM Soldadura</option>
@@ -69,7 +69,7 @@
                         </div>
                         <div class="input-group">
                             <label for="studentModule">Módulo</label>
-                            <select id="studentModule" required disabled>
+                            <select id="studentModule" disabled>
                                 <option value="" disabled selected>Selecciona primero un curso...</option>
                             </select>
                         </div>
@@ -406,7 +406,8 @@
                                         <input type="radio" name="gas-argon-reg" id="argon-reg-pending" value="PENDIENTE" checked>
                                         <label for="argon-reg-pending" class="status-btn pending">PENDIENTE</label>
                                     </div>
-                                     <div class="check-row">
+                                </div>
+                                <div class="check-row">
                                     <span>Carga actual (bar)</span>
                                     <select class="gas-pressure" data-gas="argon">
                                         <option value="" disabled selected>--</option>
@@ -452,7 +453,8 @@
                                         <input type="radio" name="gas-mix-reg" id="mix-reg-pending" value="PENDIENTE" checked>
                                         <label for="mix-reg-pending" class="status-btn pending">PENDIENTE</label>
                                     </div>
-                                    <div class="check-row">
+                                </div>
+                                <div class="check-row">
                                     <span>Carga actual (bar)</span>
                                     <select class="gas-pressure" data-gas="mix">
                                         <option value="" disabled selected>--</option>
@@ -553,7 +555,7 @@
                     </div>
                     <div class="certification-area">
                         <div class="confirmation-check">
-                            <input type="checkbox" id="confirmData" required>
+                            <input type="checkbox" id="confirmData">
                             <label for="confirmData">Certifico que los datos registrados son veraces y corresponden a la inspección realizada en el taller.</label>
                         </div>
                     </div>

@@ -1,13 +1,8 @@
 const GAS_URL = "https://script.google.com/macros/s/AKfycbxrjVvPkjC83NB1krzh_F8oeGk_JQNZJFtlY9-ycBZTN0aUFZXKJcbPEsgx9RWv0j7W/exec";
 const SHEET_NAME = "Encargados Registro";
 
-// CONFIGURACIÓN DE LA ACTIVIDAD - ENCARGADOS DE TALLER
 document.addEventListener('DOMContentLoaded', () => {
-    try {
-        initApp();
-    } catch (e) {
-        console.error("Error al iniciar la app:", e);
-    }
+    try { initApp(); } catch (e) { console.error("Error al iniciar:", e); }
 });
 
 let registrationData = {};
@@ -19,10 +14,14 @@ const modulesData = {
     "2º GS Construcciones Metálicas": ["Diseño de Estructuras Metálicas", "Procesos de Unión y Montaje"]
 };
 
-// Función segura para obtener radio buttons
+/* ─── UTILIDADES ─────────────────────────────────────────────────────── */
+
+function $id(id) { return document.getElementById(id); }
+
+// Devuelve el valor del radio seleccionado o NULL si no hay ninguno marcado
 function getRadioValue(name) {
-    const checked = document.querySelector(`input[name="${name}"]:checked`);
-    return checked ? checked.value : 'PENDIENTE';
+    const checked = document.querySelector('input[name="' + name + '"]:checked');
+    return checked ? checked.value : null;
 }
 
 function getSelectedPhase() {
@@ -31,332 +30,425 @@ function getSelectedPhase() {
 }
 
 function getDeviceId() {
-    let id = localStorage.getItem('workshop_device_id');
+    let id = localStorage.getItem('device_id');
     if (!id) {
         id = 'DEV-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-        localStorage.setItem('workshop_device_id', id);
+        localStorage.setItem('device_id', id);
     }
     return id;
 }
 
-function getShiftId(date, course, module) {
-    const cleanDate = (date || "").replace(/-/g, '');
-    const cleanCourse = (course || "").replace(/[^a-zA-Z0-9]/g, '').substr(0, 8);
-    const cleanModule = (module || "").replace(/[^a-zA-Z0-9]/g, '').substr(0, 8);
-    return `SHIFT-${cleanDate}-${cleanCourse}-${cleanModule}`.toUpperCase();
+function getShiftId(date, course, mod) {
+    const d = (date  || '').replace(/-/g, '');
+    const c = (course|| '').replace(/[^a-z0-9]/gi, '').substr(0, 6);
+    const m = (mod   || '').replace(/[^a-z0-9]/gi, '').substr(0, 6);
+    return ('SHIFT-' + d + '-' + c + '-' + m).toUpperCase();
 }
 
+/* ─── INIT ───────────────────────────────────────────────────────────── */
+
 function initApp() {
-    const entryRadio = document.getElementById('phase-entry');
-    if (entryRadio) entryRadio.checked = true;
-    
+    // Fecha de hoy por defecto
+    const dateInput = $id('regDate');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Fase ENTRADA por defecto
+    const phaseEntry = $id('phase-entry');
+    if (phaseEntry) phaseEntry.checked = true;
     syncUI();
 
-    document.querySelectorAll('input[name="regPhase"]').forEach(radio => {
-        radio.addEventListener('change', () => {
-            syncUI();
-            updateProgress();
-        });
+    // Cambio de fase
+    document.querySelectorAll('input[name="regPhase"]').forEach(function(r) {
+        r.addEventListener('change', function() { syncUI(); updateProgress(); });
     });
 
-    const courseSelect = document.getElementById('studentCourse');
-    if (courseSelect) {
-        courseSelect.addEventListener('change', (e) => {
+    // Curso → rellena módulos
+    var courseEl = $id('studentCourse');
+    if (courseEl) {
+        courseEl.addEventListener('change', function(e) {
             updateModules(e.target.value);
+            clearError(e.target);
             updateProgress();
         });
     }
 
-    const modSelect = document.getElementById('studentModule');
-    if (modSelect) modSelect.addEventListener('change', updateProgress);
-
-    const nameInput = document.getElementById('studentName');
-    if (nameInput) nameInput.addEventListener('input', updateProgress);
-
-    const dateInput = document.getElementById('regDate');
-    if (dateInput) dateInput.addEventListener('change', updateProgress);
-
-    document.querySelectorAll('.grinder-count, .tool-count').forEach(select => {
-        select.addEventListener('change', (e) => {
-            handleCountChange(e.target);
+    // Quitar el rojo cuando el usuario interactúa con cualquier campo
+    document.querySelectorAll('input, select, textarea').forEach(function(field) {
+        var events = (field.type === 'checkbox' || field.type === 'radio') ? ['change'] : ['input', 'change'];
+        events.forEach(function(evt) {
+            field.addEventListener(evt, function() {
+                clearError(field);
+                if (field.type === 'radio') {
+                    var parent = field.closest('.status-selector, .check-row-full, .cabinet-item, .check-row, .confirmation-check');
+                    if (parent) parent.classList.remove('invalid-field');
+                }
+                updateProgress();
+            });
         });
     });
 
-    document.querySelectorAll('input[type="radio"], input[type="checkbox"], .gas-pressure, textarea').forEach(el => {
-        el.addEventListener('change', updateProgress);
-        el.addEventListener('input', updateProgress);
+    // Contadores de herramientas y amoladoras
+    document.querySelectorAll('.grinder-count, .tool-count').forEach(function(s) {
+        s.addEventListener('change', function(e) { handleCountChange(e.target); });
     });
 
-    const form = document.getElementById('registrationForm');
+    // Formulario
+    var form = $id('registrationForm');
     if (form) form.addEventListener('submit', handleFormSubmit);
 
-    const btnPDF = document.getElementById('btnDownloadPDF');
-    if (btnPDF) btnPDF.addEventListener('click', () => generatePDF());
+    var btnPDF = $id('btnDownloadPDF');
+    if (btnPDF) btnPDF.addEventListener('click', function() { generatePDF(false); });
 
-    const btnNew = document.getElementById('btnNewReg');
-    if (btnNew) btnNew.addEventListener('click', () => location.reload());
+    var btnNew = $id('btnNewReg');
+    if (btnNew) btnNew.addEventListener('click', function() { location.reload(); });
 
     initAnimations();
     updateProgress();
 }
 
+/* ─── MÓDULOS ────────────────────────────────────────────────────────── */
+
 function updateModules(course) {
-    const modSelect = document.getElementById('studentModule');
-    if (!modSelect) return;
-    modSelect.innerHTML = '<option value="" disabled selected>Selecciona tu módulo...</option>';
-    modSelect.disabled = false;
-    if (modulesData[course]) {
-        modulesData[course].forEach(mod => {
-            const opt = document.createElement('option');
-            opt.value = opt.textContent = mod;
-            modSelect.appendChild(opt);
-        });
-    }
+    var modEl = $id('studentModule');
+    if (!modEl) return;
+    modEl.innerHTML = '<option value="" disabled selected>Selecciona tu módulo...</option>';
+    modEl.disabled = false;
+    var list = modulesData[course] || [];
+    list.forEach(function(mod) {
+        var opt = document.createElement('option');
+        opt.value = mod;
+        opt.textContent = mod;
+        modEl.appendChild(opt);
+    });
 }
+
+/* ─── SYNC UI (FASE) ─────────────────────────────────────────────────── */
 
 function syncUI() {
-    const phase = getSelectedPhase();
-    const header = document.querySelector('.form-header');
-    const cabinasSection = document.getElementById('sectionCabinas');
-    
-    const titleArmarios = document.getElementById('title-armarios');
-    const titleGases = document.getElementById('title-gases');
-    const labelsGas = document.querySelectorAll('.label-gas-open');
-    const iconArmarios = document.querySelector('.section-cabinets .section-header i');
+    var phase  = getSelectedPhase();
+    var isExit = (phase === 'SALIDA');
+    var header  = document.querySelector('.form-header');
+    var cabinas = $id('sectionCabinas');
+    var titleArm = $id('title-armarios');
+    var titleGas = $id('title-gases');
+    var labelsGas = document.querySelectorAll('.label-gas-open');
+    var iconArm   = document.querySelector('.section-cabinets .section-header i');
 
-    if (phase === 'SALIDA') {
-        document.body.classList.add('phase-exit');
-        if (header) header.style.background = 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)';
-        if (cabinasSection) cabinasSection.classList.remove('hidden-section');
-        
-        if (titleArmarios) titleArmarios.textContent = "4. Cierre de Armarios";
-        if (titleGases) titleGases.textContent = "5. Cierre y Control de Gases";
-        labelsGas.forEach(l => l.textContent = "Cerradas botellas");
-        if (iconArmarios) iconArmarios.setAttribute('data-lucide', 'lock');
-    } else {
-        document.body.classList.remove('phase-exit');
-        if (header) header.style.background = 'linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%)';
-        if (cabinasSection) cabinasSection.classList.add('hidden-section');
+    document.body.classList.toggle('phase-exit', isExit);
 
-        if (titleArmarios) titleArmarios.textContent = "4. Apertura de Armarios";
-        if (titleGases) titleGases.textContent = "5. Control de Gases";
-        labelsGas.forEach(l => l.textContent = "Abiertas botellas");
-        if (iconArmarios) iconArmarios.setAttribute('data-lucide', 'lock-open');
+    if (header) {
+        header.style.background = isExit
+            ? 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)'
+            : 'linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%)';
     }
-    
-    if (window.lucide) {
-        try {
-            lucide.createIcons();
-        } catch (e) {}
-    }
+
+    if (cabinas) cabinas.classList.toggle('hidden-section', !isExit);
+
+    if (titleArm) titleArm.textContent = isExit ? '4. Cierre de Armarios'       : '4. Apertura de Armarios';
+    if (titleGas) titleGas.textContent = isExit ? '5. Cierre y Control de Gases' : '5. Control de Gases';
+    labelsGas.forEach(function(l) { l.textContent = isExit ? 'Cerradas botellas' : 'Abiertas botellas'; });
+    if (iconArm) iconArm.setAttribute('data-lucide', isExit ? 'lock' : 'lock-open');
+
+    try { if (window.lucide) lucide.createIcons(); } catch(e) {}
 }
+
+/* ─── CONTADORES ─────────────────────────────────────────────────────── */
 
 function handleCountChange(s) {
     if (!s) return;
-    const target = s.dataset.target;
-    const val = parseInt(s.value) || 0;
-    const min = parseInt(s.dataset.min || 4);
-    const obsField = document.getElementById('obs' + target.charAt(0).toUpperCase() + target.slice(1));
-    
-    if (val < min) {
-        if (obsField) {
-            obsField.style.display = 'block';
-            obsField.required = true;
-        }
-    } else {
-        if (obsField) {
-            obsField.style.display = 'none';
-            obsField.required = false;
-            obsField.value = '';
-        }
+    var target = s.dataset.target;
+    var val    = parseInt(s.value) || 0;
+    var min    = parseInt(s.dataset.min || 4);
+    var key    = 'obs' + target.charAt(0).toUpperCase() + target.slice(1);
+    var obsField = $id(key);
+
+    if (obsField) {
+        if (val < min) { obsField.style.display = 'block'; obsField.required = true; }
+        else           { obsField.style.display = 'none';  obsField.required = false; obsField.value = ''; }
     }
-    
-    const grinderSelects = [...document.querySelectorAll('.grinder-count')];
-    const toolsSelects = [...document.querySelectorAll('.tool-count')];
-    const grindersMissing = grinderSelects.some(sel => (parseInt(sel.value) || 0) < 4);
-    const toolsMissing = toolsSelects.some(sel => (parseInt(sel.value) || 0) < (parseInt(sel.dataset.min) || 0));
-    
-    const warnG = document.getElementById('warningGrinders');
-    const warnT = document.getElementById('warningTools');
-    if (warnG) warnG.style.display = grindersMissing ? 'flex' : 'none';
-    if (warnT) warnT.style.display = toolsMissing ? 'flex' : 'none';
-    
+
+    var gMissing = Array.from(document.querySelectorAll('.grinder-count')).some(function(x) { return (parseInt(x.value)||0) < 4; });
+    var tMissing = Array.from(document.querySelectorAll('.tool-count')).some(function(x) { return (parseInt(x.value)||0) < (parseInt(x.dataset.min)||0); });
+
+    var wG = $id('warningGrinders'); var wT = $id('warningTools');
+    if (wG) wG.style.display = gMissing ? 'flex' : 'none';
+    if (wT) wT.style.display = tMissing ? 'flex' : 'none';
+
     updateProgress();
 }
 
+/* ─── ANIMACIONES ────────────────────────────────────────────────────── */
+
 function initAnimations() {
     if (!window.IntersectionObserver) return;
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry, index) => {
+    var obs = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry, i) {
             if (entry.isIntersecting) {
-                setTimeout(() => { entry.target.classList.add('visible'); }, index * 100);
-                observer.unobserve(entry.target);
+                setTimeout(function() { entry.target.classList.add('visible'); }, i * 80);
+                obs.unobserve(entry.target);
             }
         });
     }, { threshold: 0.1 });
-    document.querySelectorAll('.card').forEach(card => { observer.observe(card); });
+    document.querySelectorAll('.card').forEach(function(c) { obs.observe(c); });
 }
 
+/* ─── PROGRESO ───────────────────────────────────────────────────────── */
+
 function updateProgress() {
-    const phase = getSelectedPhase();
-    const isExit = phase === 'SALIDA';
-    const totalFields = isExit ? 30 : 26; 
-    let completed = 0;
+    var isExit = (getSelectedPhase() === 'SALIDA');
+    var total  = isExit ? 18 : 14;
+    var done   = 0;
 
-    if (phase) completed++;
-    const nameVal = document.getElementById('studentName');
-    if (nameVal && nameVal.value.length > 3) completed++;
-    const dateVal = document.getElementById('regDate');
-    if (dateVal && dateVal.value) completed++;
-    const courseVal = document.getElementById('studentCourse');
-    if (courseVal && courseVal.value) completed++;
-    const moduleVal = document.getElementById('studentModule');
-    if (moduleVal && moduleVal.value) completed++;
+    var nameEl = $id('studentName');   if (nameEl   && nameEl.value.trim().length > 2) done++;
+    var dateEl = $id('regDate');       if (dateEl   && dateEl.value)                   done++;
+    var courseEl = $id('studentCourse'); if (courseEl && courseEl.value)               done++;
+    var modEl  = $id('studentModule'); if (modEl    && modEl.value)                    done++;
 
-    document.querySelectorAll('.grinder-count, .tool-count').forEach(s => {
-        const target = s.dataset.target;
-        const val = parseInt(s.value) || 0;
-        const min = parseInt(s.dataset.min || 4);
-        const radioName = s.classList.contains('grinder-count') ? 'status-amol-' + target : 'status-tool-' + target;
-        const checkedVal = getRadioValue(radioName);
-        const obsField = document.getElementById('obs' + target.charAt(0).toUpperCase() + target.slice(1));
-        const obs = obsField ? obsField.value : "";
-        if (checkedVal === "OK" && (val >= min || obs.length > 5)) completed++;
-    });
+    ['gas-argon-open','gas-argon-reg','gas-argon-change',
+     'gas-mix-open',  'gas-mix-reg',  'gas-mix-change'].forEach(function(n) { if (getRadioValue(n)) done++; });
 
-    document.querySelectorAll('.cabinet-item').forEach(item => {
-        const radio = item.querySelector('input[type="radio"]:checked');
-        if (radio && radio.value === "OK") completed++;
-    });
+    document.querySelectorAll('.gas-pressure').forEach(function(s) { if (s.value) done++; });
 
-    document.querySelectorAll('.gas-pressure').forEach(s => { if (s.value) completed++; });
-    ["gas-argon-open", "gas-argon-reg", "gas-mix-open", "gas-mix-reg", "gas-argon-change", "gas-mix-change"].forEach(name => {
-        if (getRadioValue(name) === "OK" || (name.includes('change') && document.querySelector(`input[name="${name}"]:checked`))) completed++; 
-    });
+    ['status-cab-amolado','status-cab-piezas','status-cab-varillas','status-cab-profesor'].forEach(function(n) { if (getRadioValue(n)) done++; });
+
+    var confirmEl = $id('confirmData'); if (confirmEl && confirmEl.checked) done++;
 
     if (isExit) {
-        ["cab-gas-closed", "cab-clean", "area-amol-clean", "cab-tidy"].forEach(name => {
-            if (getRadioValue(name) === "OK") completed++;
+        ['cab-gas-closed','cab-clean','area-amol-clean','cab-tidy'].forEach(function(n) { if (getRadioValue(n)) done++; });
+    }
+
+    var pct = Math.min(Math.round((done / total) * 100), 100);
+    var bar = $id('formProgress');
+    if (bar) bar.style.width = pct + '%';
+}
+
+/* ─── VALIDACIÓN ─────────────────────────────────────────────────────── */
+
+function clearError(field) {
+    if (field) field.classList.remove('invalid-field');
+}
+
+function markInvalid(el) {
+    if (el) el.classList.add('invalid-field');
+}
+
+// Valida un radio group: si no hay ninguno marcado, pinta el contenedor padre
+function validateRadio(name, parentSelector) {
+    if (getRadioValue(name) !== null) return true;   // hay algo marcado → OK
+    var radios = document.getElementsByName(name);
+    if (radios.length === 0) return true;            // no existe en esta fase → ignorar
+    var parent = radios[0].closest(parentSelector || '.status-selector');
+    if (parent) markInvalid(parent);
+    return false;
+}
+
+function validateForm() {
+    // 1. Borrar errores anteriores
+    document.querySelectorAll('.invalid-field').forEach(function(e) { e.classList.remove('invalid-field'); });
+
+    var ok = true;
+
+    // ── Datos generales ──────────────────────────────────────────────
+    var nameEl = $id('studentName');
+    if (!nameEl || nameEl.value.trim().length < 3) { markInvalid(nameEl); ok = false; }
+
+    var dateEl = $id('regDate');
+    if (!dateEl || !dateEl.value) { markInvalid(dateEl); ok = false; }
+
+    var courseEl = $id('studentCourse');
+    if (!courseEl || !courseEl.value) { markInvalid(courseEl); ok = false; }
+
+    var modEl = $id('studentModule');
+    if (!modEl || !modEl.value) { markInvalid(modEl); ok = false; }
+
+    // ── Gases ────────────────────────────────────────────────────────
+    ['gas-argon-open','gas-argon-reg','gas-argon-change',
+     'gas-mix-open',  'gas-mix-reg',  'gas-mix-change'].forEach(function(n) {
+        if (!validateRadio(n, '.check-row')) ok = false;
+    });
+
+    document.querySelectorAll('.gas-pressure').forEach(function(f) {
+        if (!f.value) { markInvalid(f); ok = false; }
+    });
+
+    // ── Armarios ─────────────────────────────────────────────────────
+    ['status-cab-amolado','status-cab-piezas','status-cab-varillas','status-cab-profesor'].forEach(function(n) {
+        if (!validateRadio(n, '.cabinet-item')) ok = false;
+    });
+
+    // ── Inspección Final (solo Salida) ────────────────────────────────
+    if (getSelectedPhase() === 'SALIDA') {
+        ['cab-gas-closed','cab-clean','area-amol-clean','cab-tidy'].forEach(function(n) {
+            if (!validateRadio(n, '.check-row-full')) ok = false;
         });
     }
 
-    const warnG = document.getElementById('warningGrinders');
-    const warnT = document.getElementById('warningTools');
-    if (warnG && (warnG.style.display === 'none' || getRadioValue('status-warn-grinders') === "OK")) completed++;
-    if (warnT && (warnT.style.display === 'none' || getRadioValue('status-warn-tools') === "OK")) completed++;
+    // ── Certificación ────────────────────────────────────────────────
+    var confirmEl = $id('confirmData');
+    if (!confirmEl || !confirmEl.checked) {
+        var box = confirmEl ? confirmEl.closest('.confirmation-check') : null;
+        if (box) markInvalid(box); else if (confirmEl) markInvalid(confirmEl);
+        ok = false;
+    }
 
-    const confirmCheck = document.getElementById('confirmData');
-    if (confirmCheck && confirmCheck.checked) completed++;
-
-    const percentage = Math.min((completed / totalFields) * 100, 100);
-    const progressBar = document.getElementById('formProgress');
-    if (progressBar) progressBar.style.width = `${percentage}%`;
+    return ok;
 }
+
+/* ─── SUBMIT ─────────────────────────────────────────────────────────── */
 
 async function handleFormSubmit(e) {
     e.preventDefault();
-    
-    const amoladoras = [];
-    document.querySelectorAll('.grinder-count').forEach(s => {
-        const t = s.dataset.target;
-        amoladoras.push({ tipo: t, cantidad: s.value, estado: getRadioValue('status-amol-' + t), incidencia: (document.getElementById('obs' + t.charAt(0).toUpperCase() + t.slice(1)) || {}).value || "" });
+    var btn = $id('btnFinalize');
+
+    // ── Validar ──────────────────────────────────────────────────────
+    if (!validateForm()) {
+        if (btn) {
+            btn.classList.add('btn-error');
+            btn.textContent = '⚠️ Quedan cosas por hacer';
+            setTimeout(function() {
+                btn.classList.remove('btn-error');
+                btn.innerHTML = '<i data-lucide="save"></i> Finalizar y Generar Registro';
+                try { if (window.lucide) lucide.createIcons(); } catch(ex) {}
+            }, 4000);
+        }
+        return;
+    }
+
+    // ── Recoger datos ────────────────────────────────────────────────
+    var amoladoras = [];
+    document.querySelectorAll('.grinder-count').forEach(function(s) {
+        var t = s.dataset.target;
+        var obsEl = $id('obs' + t.charAt(0).toUpperCase() + t.slice(1));
+        amoladoras.push({ tipo: t, cantidad: s.value, estado: getRadioValue('status-amol-' + t) || 'N/A', incidencia: obsEl ? obsEl.value : '' });
     });
 
-    const herramientas = [];
-    document.querySelectorAll('.tool-count').forEach(s => {
-        const t = s.dataset.target;
-        herramientas.push({ tipo: t, cantidad: s.value, estado: getRadioValue('status-tool-' + t), incidencia: (document.getElementById('obs' + t.charAt(0).toUpperCase() + t.slice(1)) || {}).value || "" });
+    var herramientas = [];
+    document.querySelectorAll('.tool-count').forEach(function(s) {
+        var t = s.dataset.target;
+        var obsEl = $id('obs' + t.charAt(0).toUpperCase() + t.slice(1));
+        herramientas.push({ tipo: t, cantidad: s.value, estado: getRadioValue('status-tool-' + t) || 'N/A', incidencia: obsEl ? obsEl.value : '' });
     });
 
-    const armarios = [];
-    document.querySelectorAll('.section-cabinets .cabinet-item').forEach(item => {
-        const h3 = item.querySelector('h3');
-        const firstRadio = item.querySelector('input[type="radio"]');
-        armarios.push({ armario: h3 ? h3.textContent : "Desconocido", estado: getRadioValue(firstRadio ? firstRadio.name : "") });
+    var armarios = [];
+    document.querySelectorAll('.section-cabinets .cabinet-item').forEach(function(item) {
+        var h3 = item.querySelector('h3');
+        var r  = item.querySelector('input[type="radio"]');
+        armarios.push({ armario: h3 ? h3.textContent.trim() : '?', estado: r ? (getRadioValue(r.name) || 'N/A') : 'N/A' });
     });
 
-    const gases = {
-        argon: { abierta: getRadioValue('gas-argon-open'), manor: getRadioValue('gas-argon-reg'), carga: (document.querySelector('.gas-pressure[data-gas="argon"]') || {}).value || "0", cambio: getRadioValue('gas-argon-change') },
-        mix: { abierta: getRadioValue('gas-mix-open'), manor: getRadioValue('gas-mix-reg'), carga: (document.querySelector('.gas-pressure[data-gas="mix"]') || {}).value || "0", cambio: getRadioValue('gas-mix-change') }
+    var gases = {
+        argon: { abierta: getRadioValue('gas-argon-open'), manor: getRadioValue('gas-argon-reg'), carga: (document.querySelector('.gas-pressure[data-gas="argon"]') || {}).value || '0', cambio: getRadioValue('gas-argon-change') },
+        mix:   { abierta: getRadioValue('gas-mix-open'),   manor: getRadioValue('gas-mix-reg'),   carga: (document.querySelector('.gas-pressure[data-gas="mix"]')   || {}).value || '0', cambio: getRadioValue('gas-mix-change') }
     };
 
-    const phaseVal = getSelectedPhase();
-    let cabinas = null;
+    var phaseVal = getSelectedPhase();
+    var cabinas  = null;
     if (phaseVal === 'SALIDA') {
         cabinas = { gas: getRadioValue('cab-gas-closed'), limpia: getRadioValue('cab-clean'), amolado: getRadioValue('area-amol-clean'), ordenada: getRadioValue('cab-tidy') };
     }
 
-    const securityMeta = { deviceId: getDeviceId(), userAgent: navigator.userAgent, platform: navigator.platform, screen: `${window.screen.width}x${window.screen.height}`, language: navigator.language };
-    const dateVal = document.getElementById('regDate').value;
-    const courseVal = document.getElementById('studentCourse').value;
-    const moduleVal = document.getElementById('studentModule').value;
-    const shiftId = getShiftId(dateVal, courseVal, moduleVal);
+    var dateVal   = $id('regDate').value;
+    var courseVal = $id('studentCourse').value;
+    var moduleVal = $id('studentModule').value;
+    var shiftId   = getShiftId(dateVal, courseVal, moduleVal);
 
     registrationData = {
-        phase: phaseVal, shiftId: shiftId, name: document.getElementById('studentName').value, date: dateVal, course: courseVal, module: moduleVal,
-        amoladoras, herramientas, armarios, gases, cabinas,
-        warnGrinders: getRadioValue('status-warn-grinders'), warnTools: getRadioValue('status-warn-tools'),
-        notes: document.getElementById('additionalNotes').value,
-        timestamp: new Date().toLocaleString('es-ES'), security: securityMeta
+        phase: phaseVal, shiftId: shiftId,
+        name: $id('studentName').value, date: dateVal, course: courseVal, module: moduleVal,
+        amoladoras: amoladoras, herramientas: herramientas, armarios: armarios,
+        gases: gases, cabinas: cabinas,
+        notes: ($id('additionalNotes') || {}).value || '',
+        timestamp: new Date().toLocaleString('es-ES'),
+        security: { deviceId: getDeviceId() }
     };
 
+    // ── Enviar ───────────────────────────────────────────────────────
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Enviando...'; }
+
     try {
-        const pdfData = await generatePDF(true);
-        const payload = {
-            fecha: registrationData.date, nombre: registrationData.name, modulo: `SAP - ${registrationData.phase}`, tipo: shiftId, 
-            checks: JSON.stringify(registrationData), pdfNombre: `Registro_${registrationData.phase}_${registrationData.date}.pdf`, pdf: pdfData.base64, hojaTarget: SHEET_NAME
+        var pdfData = await generatePDF(true);
+        var payload = {
+            fecha: dateVal, nombre: registrationData.name,
+            modulo: 'SAP - ' + phaseVal, tipo: shiftId,
+            checks: JSON.stringify(registrationData),
+            pdfNombre: 'Registro_' + phaseVal + '_' + dateVal + '.pdf',
+            pdf: pdfData ? pdfData.base64 : '',
+            hojaTarget: SHEET_NAME
         };
         await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        document.getElementById('resultOverlay').style.display = 'flex';
-    } catch (error) { console.error(error); alert('Error en el envío.'); document.getElementById('resultOverlay').style.display = 'flex'; }
+        $id('resultOverlay').style.display = 'flex';
+    } catch (err) {
+        console.error(err);
+        alert('Error al enviar. Comprueba tu conexión.');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="save"></i> Finalizar y Generar Registro';
+            try { if (window.lucide) lucide.createIcons(); } catch(ex) {}
+        }
+    }
 }
 
-async function generatePDF(returnBase64 = false) {
-    if (!window.jspdf) return;
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const data = registrationData;
-    const isExit = data.phase === 'SALIDA';
-    const headerColor = isExit ? [29, 78, 216] : [15, 23, 42];
+/* ─── PDF ────────────────────────────────────────────────────────────── */
 
-    doc.setFillColor(...headerColor); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.text(`REGISTRO DE ${data.phase}`, 20, 25);
-    doc.setTextColor(0, 0, 0); doc.setFontSize(10);
-    doc.text(`Alumno: ${data.name} | Fecha: ${data.date}`, 20, 50);
-    doc.setFontSize(8); doc.setTextColor(150, 150, 150); doc.text(`Shift ID: ${data.shiftId}`, 140, 45); doc.text(`ID Dispositivo: ${data.security.deviceId}`, 140, 50); doc.setTextColor(0,0,0); doc.setFontSize(10);
+async function generatePDF(returnBase64) {
+    if (!window.jspdf) { alert('Librería PDF no cargada.'); return null; }
+    var jsPDF = window.jspdf.jsPDF;
+    var doc  = new jsPDF();
+    var d    = registrationData;
+    var isExit = (d.phase === 'SALIDA');
 
-    let y = 70;
-    doc.setFont("helvetica", "bold"); doc.text("1. DATOS GENERALES", 20, y); doc.setFont("helvetica", "normal"); y += 8;
-    doc.text(`Curso: ${data.course} | Módulo: ${data.module}`, 25, y); y += 10;
+    // Cabecera
+    doc.setFillColor.apply(doc, isExit ? [29,78,216] : [15,23,42]);
+    doc.rect(0, 0, 210, 40, 'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(20);
+    doc.text('REGISTRO DE ' + d.phase, 20, 25);
+    doc.setTextColor(0,0,0); doc.setFontSize(10);
+    doc.text('Alumno: ' + d.name + ' | Fecha: ' + d.date, 20, 50);
+    doc.setFontSize(7); doc.setTextColor(130,130,130);
+    doc.text('Shift ID: ' + d.shiftId + '   Device: ' + d.security.deviceId, 20, 56);
 
-    doc.setFont("helvetica", "bold"); doc.text("2. MAQUINARIA Y AMOLADORAS", 20, y); doc.setFont("helvetica", "normal"); y += 8;
-    data.amoladoras.forEach(a => { doc.text(`- Amoladora ${a.tipo}: ${a.cantidad}/4 [${a.estado}] ${a.incidencia ? '| Nota: ' + a.incidencia : ''}`, 25, y); y += 6; });
-    
-    y += 5; doc.setFont("helvetica", "bold"); doc.text("3. HERRAMIENTAS MANUALES", 20, y); doc.setFont("helvetica", "normal"); y += 8;
-    data.herramientas.forEach(h => { doc.text(`- ${h.tipo}: ${h.cantidad} [${h.estado}] ${h.incidencia ? '| Nota: ' + h.incidencia : ''}`, 25, y); y += 6; });
-    
-    y += 5; doc.setFont("helvetica", "bold"); doc.text("4. CONTROL DE ARMARIOS", 20, y); doc.setFont("helvetica", "normal"); y += 8;
-    data.armarios.forEach(arm => { doc.text(`- ${arm.armario}: ${arm.estado}`, 25, y); y += 6; });
-    
-    y += 5; doc.setFont("helvetica", "bold"); doc.text("5. CONTROL DE GASES", 20, y); doc.setFont("helvetica", "normal"); y += 8;
-    doc.text(`- Argón: ${data.gases.argon.carga} bar [Estado: ${data.gases.argon.abierta}, Manor: ${data.gases.argon.manor}, Cambio: ${data.gases.argon.cambio}]`, 25, y); y += 6;
-    doc.text(`- Mezcla: ${data.gases.mix.carga} bar [Estado: ${data.gases.mix.abierta}, Manor: ${data.gases.mix.manor}, Cambio: ${data.gases.mix.cambio}]`, 25, y);
-    
-    if (isExit && data.cabinas) {
-        y += 5; doc.setFont("helvetica", "bold"); doc.text("6. INSPECCIÓN FINAL", 20, y); doc.setFont("helvetica", "normal"); y += 8;
-        doc.text(`- Gas (Cabinas): ${data.cabinas.gas} | Amolado limpio: ${data.cabinas.amolado}`, 25, y); y += 6;
-        doc.text(`- Cabinas limpias: ${data.cabinas.limpia} | Taller ordenado: ${data.cabinas.ordenada}`, 25, y); y += 6;
+    var y = 68;
+    function title(t) { doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(0,0,0); doc.text(t, 20, y); doc.setFont('helvetica','normal'); y += 8; }
+    function line(t)  { doc.setFontSize(9); doc.setTextColor(40,40,40); doc.text(t, 26, y); y += 6; }
+
+    title('1. DATOS GENERALES');
+    line('Curso: ' + d.course + ' | Módulo: ' + d.module); y += 3;
+
+    title('2. MAQUINARIA Y AMOLADORAS');
+    (d.amoladoras || []).forEach(function(a) { line('- ' + a.tipo + ': ' + a.cantidad + ' uds [' + a.estado + ']' + (a.incidencia ? ' | ' + a.incidencia : '')); }); y += 3;
+
+    title('3. HERRAMIENTAS MANUALES');
+    (d.herramientas || []).forEach(function(h) { line('- ' + h.tipo + ': ' + h.cantidad + ' uds [' + h.estado + ']' + (h.incidencia ? ' | ' + h.incidencia : '')); }); y += 3;
+
+    title('4. CONTROL DE ARMARIOS');
+    (d.armarios || []).forEach(function(a) { line('- ' + a.armario + ': ' + a.estado); }); y += 3;
+
+    title('5. CONTROL DE GASES');
+    if (d.gases) {
+        line('- Argón: ' + d.gases.argon.carga + ' bar | Botellas: ' + d.gases.argon.abierta + ' | Manorreductor: ' + d.gases.argon.manor + ' | Cambio: ' + d.gases.argon.cambio);
+        line('- Mezcla: ' + d.gases.mix.carga  + ' bar | Botellas: ' + d.gases.mix.abierta  + ' | Manorreductor: ' + d.gases.mix.manor  + ' | Cambio: ' + d.gases.mix.cambio);
+    }
+    y += 3;
+
+    if (isExit && d.cabinas) {
+        title('6. INSPECCIÓN FINAL');
+        line('- Gas Cabinas: ' + d.cabinas.gas + ' | Amolado: ' + d.cabinas.amolado);
+        line('- Cabinas limpias: ' + d.cabinas.limpia + ' | Taller ordenado: ' + d.cabinas.ordenada);
+        y += 3;
     }
 
-    y += 15; doc.setFont("helvetica", "bold"); doc.text("7. CERTIFICACIÓN", 20, y); y += 8;
-    doc.setFont("helvetica", "normal");
-    doc.text("El alumno certifica la veracidad de los datos registrados y el estado del taller.", 20, y); y += 10;
-    
-    doc.setFont("helvetica", "bold"); doc.text("OBSERVACIONES ADICIONALES", 20, y); y += 8;
-    doc.setFont("helvetica", "normal");
-    const notes = doc.splitTextToSize(data.notes || "Sin observaciones.", 170);
-    doc.text(notes, 20, y);
+    title('7. OBSERVACIONES');
+    var noteLines = doc.splitTextToSize(d.notes || 'Sin observaciones.', 170);
+    doc.setFontSize(9); doc.setTextColor(40,40,40);
+    doc.text(noteLines, 20, y); y += noteLines.length * 6 + 6;
+
+    doc.setFontSize(8); doc.setTextColor(100,100,100);
+    doc.text('El alumno encargado certifica la veracidad de los datos registrados en el taller.', 20, y);
 
     if (returnBase64) return { base64: doc.output('datauristring').split(',')[1] };
-    else doc.save(`Registro_${data.phase}_${data.date}.pdf`);
+    doc.save('Registro_' + d.phase + '_' + d.date + '.pdf');
+    return null;
 }
