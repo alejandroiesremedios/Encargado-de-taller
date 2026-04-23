@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Actividades — Encargados de Taller</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="app-wrapper">
+        <header class="main-header">
+            <div class="header-content">
+                <div class="logo-area">
+                    <div class="logo-icon">SAP</div>
+                    <div class="title-group">
+                        <h1>Encargados de Taller</h1>
+                        <p>Soldadura en Atmósfera Protegida</p>
+                    </div>
+                </div>
+                <div class="header-meta">
+                    <span id="currentDateDisplay"></span>
+                </div>
+            </div>
+            <div class="progress-container">
+                <div id="formProgress" class="progress-bar"></div>
+            </div>
+        </header>
+
+        <main class="content-area">
+            <form id="registrationForm" class="registration-form">
+                
+                <!-- SECCIÓN 1: DATOS GENERALES -->
+                <section class="form-section card section-id">
+                    <div class="section-header">
+                        <i data-lucide="user"></i>
+                        <h2>1. Datos Generales</h2>
+                    </div>
+                    <div class="grid-inputs">
+                        <div class="input-group full-width">
+                            <label>Fase del Registro</label>
+                            <div class="status-selector phase-selector">
+                                <input type="radio" name="regPhase" id="phase-entry" value="ENTRADA" checked>
+                                <label for="phase-entry" class="status-btn phase-btn entry">🟢 ENTRADA</label>
+                                
+                                <input type="radio" name="regPhase" id="phase-exit" value="SALIDA">
+                                <label for="phase-exit" class="status-btn phase-btn exit">🔴 SALIDA</label>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="studentName">Nombre y Apellidos</label>
+                            <input type="text" id="studentName" placeholder="Escribe tu nombre completo..." required>
+                        </div>
+                        <div class="input-group">
+                            <label for="regDate">Fecha</label>
+                            <input type="date" id="regDate" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="studentCourse">Ciclo Formativo</label>
+                            <select id="studentCourse" required>
+                                <option value="" disabled selected>Selecciona tu curso...</option>
+                                <option value="1º GM Soldadura">1º GM Soldadura</option>
+                                <option value="2º GM Soldadura">2º GM Soldadura</option>
+                                <option value="1º GS Construcciones Metálicas">1º GS Const. Metálicas</option>
+                                <option value="2º GS Construcciones Metálicas">2º GS Const. Metálicas</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="studentModule">Módulo</label>
+                            <select id="studentModule" required disabled>
+                                <option value="" disabled selected>Selecciona primero un curso...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="moduleWarning" class="alert-box warning" style="display: none; margin-top: 1rem;">
+                        <i data-lucide="alert-triangle"></i>
+                        <p>Este registro debe pertenecer al módulo de <strong>SAP</strong>.</p>
+                    </div>
+                </section>
+
+                <!-- SECCIÓN 2: CONTROL DE AMOLADORAS -->
+                <section class="form-section card section-grinders">
+                    <div class="section-header">
+                        <i data-lucide="disc"></i>
+                        <h2>2. Control de Amoladoras</h2>
+                    </div>
+                    
+                    <div class="checklist-container">
+                        <!-- Amoladoras Grandes -->
+                        <div class="checklist-item grinder-item" id="itemGrinderLarge">
+                            <div class="check-info">
+                                <h3>Amoladoras Grandes</h3>
+                                <p>Debe haber 4 unidades operativas.</p>
+                            </div>
+                            <div class="check-actions">
+                                <div class="count-selector">
+                                    <label>Cant:</label>
+                                    <select class="grinder-count" data-target="large" data-min="4">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4" selected>4</option>
+                                    </select>
+                                </div>
+                                <div class="status-selector sm">
+                                    <input type="radio" name="status-amol-large" id="amol-large-ok" value="OK">
+                                    <label for="amol-large-ok" class="status-btn ok">OK</label>
+                                    <input type="radio" name="status-amol-large" id="amol-large-pending" value="PENDIENTE" checked>
+                                    <label for="amol-large-pending" class="status-btn pending">PENDIENTE</label>
+                                </div>
+                                <input type="text" class="grinder-obs" id="obsLarge" placeholder="Nota de la incidencia..." style="display:none;">
+                            </div>
+                        </div>
+                        
+                        <!-- Amoladoras Pequeñas -->
+                        <div class="checklist-item grinder-item" id="itemGrinderSmall">
+                            <div class="check-info">
+                                <h3>Amoladoras Pequeñas</h3>
+                                <p>Debe haber 4 unidades operativas.</p>
+                            </div>
+                            <div class="check-actions">
+                                <div class="count-selector">
+                                    <label>Cant:</label>
+                                    <select class="grinder-count" data-target="small" data-min="4">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4" selected>4</option>
+                                    </select>
+                                </div>
+                                <div class="status-selector sm">
+                                    <input type="radio" name="status-amol-small" id="amol-small-ok" value="OK">
+                                    <label for="amol-small-ok" class="status-btn ok">OK</label>
+                                    <input type="radio" name="status-amol-small" id="amol-small-pending" value="PENDIENTE" checked>
+                                    <label for="amol-small-pending" class="status-btn pending">PENDIENTE</label>
+                                </div>
+                                <input type="text" class="grinder-obs" id="obsSmall" placeholder="Nota de la incidencia..." style="display:none;">
+                            </div>
+                        </div>
+
+                        <!-- AVISO AL PROFESOR SECCIÓN 2 -->
+                        <div id="warningGrinders" class="section-warning" style="display: none;">
+                            <div class="warning-text">
+                                <i data-lucide="alert-triangle"></i>
+                                <span>Faltan amoladoras. Avisa al profesor.</span>
+                            </div>
+                            <div class="status-selector sm">
+                                <input type="radio" name="status-warn-grinders" id="warn-grinders-ok" value="OK">
+                                <label for="warn-grinders-ok" class="status-btn ok">OK</label>
+                                <input type="radio" name="status-warn-grinders" id="warn-grinders-pending" value="PENDIENTE" checked>
+                                <label for="warn-grinders-pending" class="status-btn pending">PENDIENTE</label>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECCIÓN 3: CONTROL DE HERRAMIENTAS -->
+                <section class="form-section card section-tools">
+                    <div class="section-header">
+                        <i data-lucide="hammer"></i>
+                        <h2>3. Control de Herramientas</h2>
+                    </div>
+                    
+                    <div class="checklist-container">
+                        <!-- Martillos -->
+                        <div class="checklist-item tool-item">
+                            <div class="check-info">
+                                <h3>Martillos</h3>
+                                <p>Mínimo 6 unidades operativas.</p>
+                            </div>
+                            <div class="check-actions">
+                                <div class="count-selector">
+                                    <label>Cant:</label>
+                                    <select class="tool-count" data-target="martillos" data-min="6">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6" selected>6</option>
+                                    </select>
+                                </div>
+                                <div class="status-selector sm">
+                                    <input type="radio" name="status-tool-martillos" id="tool-martillos-ok" value="OK">
+                                    <label for="tool-martillos-ok" class="status-btn ok">OK</label>
+                                    <input type="radio" name="status-tool-martillos" id="tool-martillos-pending" value="PENDIENTE" checked>
+                                    <label for="tool-martillos-pending" class="status-btn pending">PENDIENTE</label>
+                                </div>
+                                <input type="text" class="tool-obs" id="obsMartillos" placeholder="Nota de la incidencia..." style="display:none;">
+                            </div>
+                        </div>
+
+                        <!-- Cinceles -->
+                        <div class="checklist-item tool-item">
+                            <div class="check-info">
+                                <h3>Cinceles o Cortafríos</h3>
+                                <p>Mínimo 6 unidades operativas.</p>
+                            </div>
+                            <div class="check-actions">
+                                <div class="count-selector">
+                                    <label>Cant:</label>
+                                    <select class="tool-count" data-target="cinceles" data-min="6">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6" selected>6</option>
+                                    </select>
+                                </div>
+                                <div class="status-selector sm">
+                                    <input type="radio" name="status-tool-cinceles" id="tool-cinceles-ok" value="OK">
+                                    <label for="tool-cinceles-ok" class="status-btn ok">OK</label>
+                                    <input type="radio" name="status-tool-cinceles" id="tool-cinceles-pending" value="PENDIENTE" checked>
+                                    <label for="tool-cinceles-pending" class="status-btn pending">PENDIENTE</label>
+                                </div>
+                                <input type="text" class="tool-obs" id="obsCinceles" placeholder="Nota de la incidencia..." style="display:none;">
+                            </div>
+                        </div>
+
+                        <!-- Alicates Pico Loro -->
+                        <div class="checklist-item tool-item">
+                            <div class="check-info">
+                                <h3>Alicates Pico de Loro</h3>
+                                <p>Mínimo 8 unidades operativas.</p>
+                            </div>
+                            <div class="check-actions">
+                                <div class="count-selector">
+                                    <label>Cant:</label>
+                                    <select class="tool-count" data-target="alicates" data-min="8">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6">6</option>
+                                        <option value="7">7</option>
+                                        <option value="8" selected>8</option>
+                                    </select>
+                                </div>
+                                <div class="status-selector sm">
+                                    <input type="radio" name="status-tool-alicates" id="tool-alicates-ok" value="OK">
+                                    <label for="tool-alicates-ok" class="status-btn ok">OK</label>
+                                    <input type="radio" name="status-tool-alicates" id="tool-alicates-pending" value="PENDIENTE" checked>
+                                    <label for="tool-alicates-pending" class="status-btn pending">PENDIENTE</label>
+                                </div>
+                                <input type="text" class="tool-obs" id="obsAlicates" placeholder="Nota de la incidencia..." style="display:none;">
+                            </div>
+                        </div>
+
+                        <!-- Escuadras -->
+                        <div class="checklist-item tool-item">
+                            <div class="check-info">
+                                <h3>Escuadras</h3>
+                                <p>Mínimo 6 unidades operativas.</p>
+                            </div>
+                            <div class="check-actions">
+                                <div class="count-selector">
+                                    <label>Cant:</label>
+                                    <select class="tool-count" data-target="escuadras" data-min="6">
+                                        <option value="0">0</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6" selected>6</option>
+                                    </select>
+                                </div>
+                                <div class="status-selector sm">
+                                    <input type="radio" name="status-tool-escuadras" id="tool-escuadras-ok" value="OK">
+                                    <label for="tool-escuadras-ok" class="status-btn ok">OK</label>
+                                    <input type="radio" name="status-tool-escuadras" id="tool-escuadras-pending" value="PENDIENTE" checked>
+                                    <label for="tool-escuadras-pending" class="status-btn pending">PENDIENTE</label>
+                                </div>
+                                <input type="text" class="tool-obs" id="obsEscuadras" placeholder="Nota de la incidencia..." style="display:none;">
+                            </div>
+                        </div>
+                        <!-- AVISO AL PROFESOR SECCIÓN 3 -->
+                        <div id="warningTools" class="section-warning" style="display: none;">
+                            <div class="warning-text">
+                                <i data-lucide="alert-triangle"></i>
+                                <span>Faltan herramientas. Avisa al profesor.</span>
+                            </div>
+                            <div class="status-selector sm">
+                                <input type="radio" name="status-warn-tools" id="warn-tools-ok" value="OK">
+                                <label for="warn-tools-ok" class="status-btn ok">OK</label>
+                                <input type="radio" name="status-warn-tools" id="warn-tools-pending" value="PENDIENTE" checked>
+                                <label for="warn-tools-pending" class="status-btn pending">PENDIENTE</label>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECCIÓN 4: APERTURA DE ARMARIOS -->
+                <section class="form-section card section-cabinets">
+                    <div class="section-header">
+                        <i data-lucide="lock-open"></i>
+                        <h2 id="title-armarios">4. Apertura de Armarios</h2>
+                    </div>
+                    
+                    <div class="checklist-container">
+                        <!-- Amolado -->
+                        <div class="checklist-item cabinet-item">
+                            <div class="check-info">
+                                <h3>Armario de Amolado</h3>
+                                <p>Verificar apertura y orden interno.</p>
+                            </div>
+                            <div class="check-actions">
+                                <div class="status-selector">
+                                    <input type="radio" name="status-cab-amolado" id="cab-amolado-ok" value="OK">
+                                    <label for="cab-amolado-ok" class="status-btn ok">OK</label>
+                                    
+                                    <input type="radio" name="status-cab-amolado" id="cab-amolado-pending" value="PENDIENTE" checked>
+                                    <label for="cab-amolado-pending" class="status-btn pending">PENDIENTE</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Piezas -->
+                        <div class="checklist-item cabinet-item">
+                            <div class="check-info">
+                                <h3>Armario de Piezas</h3>
+                                <p>Disponibilidad de material base para la sesión.</p>
+                            </div>
+                            <div class="check-actions">
+                                <div class="status-selector">
+                                    <input type="radio" name="status-cab-piezas" id="cab-piezas-ok" value="OK">
+                                    <label for="cab-piezas-ok" class="status-btn ok">OK</label>
+                                    
+                                    <input type="radio" name="status-cab-piezas" id="cab-piezas-pending" value="PENDIENTE" checked>
+                                    <label for="cab-piezas-pending" class="status-btn pending">PENDIENTE</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Varillas -->
+                        <div class="checklist-item cabinet-item">
+                            <div class="check-info">
+                                <h3>Armario de Varillas / Aporte</h3>
+                                <p>Control de material de aporte y consumibles.</p>
+                            </div>
+                            <div class="check-actions">
+                                <div class="status-selector">
+                                    <input type="radio" name="status-cab-varillas" id="cab-varillas-ok" value="OK">
+                                    <label for="cab-varillas-ok" class="status-btn ok">OK</label>
+                                    
+                                    <input type="radio" name="status-cab-varillas" id="cab-varillas-pending" value="PENDIENTE" checked>
+                                    <label for="cab-varillas-pending" class="status-btn pending">PENDIENTE</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Profesor -->
+                        <div class="checklist-item cabinet-item">
+                            <div class="check-info">
+                                <h3>Armario del Profesor</h3>
+                                <p>Acceso a herramientas especiales y documentación.</p>
+                            </div>
+                            <div class="check-actions">
+                                <div class="status-selector">
+                                    <input type="radio" name="status-cab-profesor" id="cab-profesor-ok" value="OK">
+                                    <label for="cab-profesor-ok" class="status-btn ok">OK</label>
+                                    
+                                    <input type="radio" name="status-cab-profesor" id="cab-profesor-pending" value="PENDIENTE" checked>
+                                    <label for="cab-profesor-pending" class="status-btn pending">PENDIENTE</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECCIÓN 5: CONTROL DE GASES -->
+                <section class="form-section card section-gases">
+                    <div class="section-header">
+                        <i data-lucide="wind"></i>
+                        <h2 id="title-gases">5. Control de Gases</h2>
+                    </div>
+                    
+                    <div class="gas-container">
+                        <!-- Argón -->
+                        <div class="gas-item card-sub">
+                            <h3>Gas Argón (TIG)</h3>
+                            <div class="gas-checks">
+                                <div class="check-row">
+                                    <span class="label-gas-open">Abiertas botellas</span>
+                                    <div class="status-selector sm">
+                                        <input type="radio" name="gas-argon-open" id="argon-open-ok" value="OK">
+                                        <label for="argon-open-ok" class="status-btn ok">OK</label>
+                                        <input type="radio" name="gas-argon-open" id="argon-open-pending" value="PENDIENTE" checked>
+                                        <label for="argon-open-pending" class="status-btn pending">PENDIENTE</label>
+                                    </div>
+                                </div>
+                                <div class="check-row">
+                                    <span>Manorreductor</span>
+                                    <div class="status-selector sm">
+                                        <input type="radio" name="gas-argon-reg" id="argon-reg-ok" value="OK">
+                                        <label for="argon-reg-ok" class="status-btn ok">OK</label>
+                                        <input type="radio" name="gas-argon-reg" id="argon-reg-pending" value="PENDIENTE" checked>
+                                        <label for="argon-reg-pending" class="status-btn pending">PENDIENTE</label>
+                                    </div>
+                                     <div class="check-row">
+                                    <span>Carga actual (bar)</span>
+                                    <select class="gas-pressure" data-gas="argon">
+                                        <option value="" disabled selected>--</option>
+                                        <option value="0">0</option><option value="10">10</option><option value="20">20</option>
+                                        <option value="30">30</option><option value="40">40</option><option value="50">50</option>
+                                        <option value="60">60</option><option value="70">70</option><option value="80">80</option>
+                                        <option value="90">90</option><option value="100">100</option><option value="110">110</option>
+                                        <option value="120">120</option><option value="130">130</option><option value="140">140</option>
+                                        <option value="150">150</option><option value="160">160</option><option value="170">170</option>
+                                        <option value="180">180</option><option value="190">190</option><option value="200">200</option>
+                                    </select>
+                                </div>
+                                <div class="check-row">
+                                    <span>Cambio de botellas</span>
+                                    <div class="status-selector sm">
+                                        <input type="radio" name="gas-argon-change" id="argon-change-si" value="SÍ">
+                                        <label for="argon-change-si" class="status-btn ok">SÍ</label>
+                                        <input type="radio" name="gas-argon-change" id="argon-change-no" value="NO" checked>
+                                        <label for="argon-change-no" class="status-btn pending">NO</label>
+                                    </div>
+                                </div>                             </div>
+                            </div>
+                        </div>
+
+                        <!-- Mezcla -->
+                        <div class="gas-item card-sub">
+                            <h3>Mezcla Argón/CO2 (MIG-MAG)</h3>
+                            <div class="gas-checks">
+                                <div class="check-row">
+                                    <span class="label-gas-open">Abiertas botellas</span>
+                                    <div class="status-selector sm">
+                                        <input type="radio" name="gas-mix-open" id="mix-open-ok" value="OK">
+                                        <label for="mix-open-ok" class="status-btn ok">OK</label>
+                                        <input type="radio" name="gas-mix-open" id="mix-open-pending" value="PENDIENTE" checked>
+                                        <label for="mix-open-pending" class="status-btn pending">PENDIENTE</label>
+                                    </div>
+                                </div>
+                                <div class="check-row">
+                                    <span>Manorreductor</span>
+                                    <div class="status-selector sm">
+                                        <input type="radio" name="gas-mix-reg" id="mix-reg-ok" value="OK">
+                                        <label for="mix-reg-ok" class="status-btn ok">OK</label>
+                                        <input type="radio" name="gas-mix-reg" id="mix-reg-pending" value="PENDIENTE" checked>
+                                        <label for="mix-reg-pending" class="status-btn pending">PENDIENTE</label>
+                                    </div>
+                                    <div class="check-row">
+                                    <span>Carga actual (bar)</span>
+                                    <select class="gas-pressure" data-gas="mix">
+                                        <option value="" disabled selected>--</option>
+                                        <option value="0">0</option><option value="10">10</option><option value="20">20</option>
+                                        <option value="30">30</option><option value="40">40</option><option value="50">50</option>
+                                        <option value="60">60</option><option value="70">70</option><option value="80">80</option>
+                                        <option value="90">90</option><option value="100">100</option><option value="110">110</option>
+                                        <option value="120">120</option><option value="130">130</option><option value="140">140</option>
+                                        <option value="150">150</option><option value="160">160</option><option value="170">170</option>
+                                        <option value="180">180</option><option value="190">190</option><option value="200">200</option>
+                                    </select>
+                                </div>
+                                <div class="check-row">
+                                    <span>Cambio de botellas</span>
+                                    <div class="status-selector sm">
+                                        <input type="radio" name="gas-mix-change" id="mix-change-si" value="SÍ">
+                                        <label for="mix-change-si" class="status-btn ok">SÍ</label>
+                                        <input type="radio" name="gas-mix-change" id="mix-change-no" value="NO" checked>
+                                        <label for="mix-change-no" class="status-btn pending">NO</label>
+                                    </div>
+                                </div>                              </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECCIÓN 6: INSPECCIÓN FINAL (SOLO SALIDA) -->
+                <section id="sectionCabinas" class="form-section card section-cabinas hidden-section">
+                    <div class="section-header">
+                        <i data-lucide="layout"></i>
+                        <h2>6. Inspección Final</h2>
+                    </div>
+                    
+                    <div class="checklist-container">
+                        <div class="checklist-item">
+                            <div class="check-info">
+                                <h3>Limpieza y Cierre</h3>
+                                <p>Verificar el estado final de las zonas de trabajo y servicios.</p>
+                            </div>
+                            <div class="check-actions-vertical">
+                                <div class="check-row-full">
+                                    <span>Gas cerrado (Cabinas)</span>
+                                    <div class="status-selector sm">
+                                        <input type="radio" name="cab-gas-closed" id="cab-gas-ok" value="OK">
+                                        <label for="cab-gas-ok" class="status-btn ok">OK</label>
+                                        <input type="radio" name="cab-gas-closed" id="cab-gas-pending" value="PENDIENTE" checked>
+                                        <label for="cab-gas-pending" class="status-btn pending">PENDIENTE</label>
+                                    </div>
+                                </div>
+                                <div class="check-row-full">
+                                    <span>Cabinas limpias/ordenadas</span>
+                                    <div class="status-selector sm">
+                                        <input type="radio" name="cab-clean" id="cab-clean-ok" value="OK">
+                                        <label for="cab-clean-ok" class="status-btn ok">OK</label>
+                                        <input type="radio" name="cab-clean" id="cab-clean-pending" value="PENDIENTE" checked>
+                                        <label for="cab-clean-pending" class="status-btn pending">PENDIENTE</label>
+                                    </div>
+                                </div>
+                                <div class="check-row-full">
+                                    <span>Zona de amolado limpia</span>
+                                    <div class="status-selector sm">
+                                        <input type="radio" name="area-amol-clean" id="amol-clean-ok" value="OK">
+                                        <label for="amol-clean-ok" class="status-btn ok">OK</label>
+                                        <input type="radio" name="area-amol-clean" id="amol-clean-pending" value="PENDIENTE" checked>
+                                        <label for="amol-clean-pending" class="status-btn pending">PENDIENTE</label>
+                                    </div>
+                                </div>
+                                <div class="check-row-full">
+                                    <span>Taller ordenado (General)</span>
+                                    <div class="status-selector sm">
+                                        <input type="radio" name="cab-tidy" id="cab-tidy-ok" value="OK">
+                                        <label for="cab-tidy-ok" class="status-btn ok">OK</label>
+                                        <input type="radio" name="cab-tidy" id="cab-tidy-pending" value="PENDIENTE" checked>
+                                        <label for="cab-tidy-pending" class="status-btn pending">PENDIENTE</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECCIÓN 7: INCIDENCIAS Y OBSERVACIONES -->
+                <section class="form-section card section-notes">
+                    <div class="section-header">
+                        <i data-lucide="message-square"></i>
+                        <h2>7. Observaciones Adicionales</h2>
+                    </div>
+                    <div class="input-group">
+                        <textarea id="additionalNotes" placeholder="Describa cualquier incidencia o nota relevante de la jornada..."></textarea>
+                    </div>
+                </section>
+
+                <!-- SECCIÓN 8: CERTIFICACIÓN -->
+                <section class="form-section card section-certification">
+                    <div class="section-header">
+                        <i data-lucide="shield-check"></i>
+                        <h2>8. Certificación</h2>
+                    </div>
+                    <div class="certification-area">
+                        <div class="confirmation-check">
+                            <input type="checkbox" id="confirmData" required>
+                            <label for="confirmData">Certifico que los datos registrados son veraces y corresponden a la inspección realizada en el taller.</label>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="form-actions">
+                    <button type="submit" id="btnFinalize" class="btn-primary">
+                        <i data-lucide="save"></i> Finalizar y Generar Registro
+                    </button>
+                    <button type="reset" class="btn-ghost">Limpiar Formulario</button>
+                </div>
+            </form>
+
+            <div id="resultOverlay" class="overlay" style="display:none;">
+                <div class="result-card">
+                    <i data-lucide="check-circle" class="success-icon"></i>
+                    <h2>Registro Completado</h2>
+                    <p>La actividad ha sido procesada correctamente.</p>
+                    <div class="result-actions">
+                        <button id="btnDownloadPDF" class="btn-success">
+                            <i data-lucide="file-text"></i> Descargar PDF
+                        </button>
+                        <button id="btnNewReg" class="btn-secondary">Nuevo Registro</button>
+                    </div>
+                    <p id="syncStatus" class="status-msg"></p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
